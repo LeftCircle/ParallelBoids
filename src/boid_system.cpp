@@ -194,8 +194,10 @@ void BoidSystem::update_boids_cuda(double delta) {
 // --- CPU Boid Logic ---
 void BoidSystem::_process_cpu(double delta) {
     TypedArray<BoidOOP> current_boids = boid_oops; // Work on a copy? Or directly? Be careful if modifying array during iteration.
-    Vector<Vector3> forces;
-    forces.resize(current_boids.size()); // Pre-allocate forces vector
+    //Vector<Vector3> forces;
+    //forces.resize(current_boids.size()); // Pre-allocate forces vector
+	TypedArray<Vector3> forces;
+	forces.resize(current_boids.size()); // Pre-allocate forces vector
 
     for (int i = 0; i < current_boids.size(); ++i) {
         Variant v_i = current_boids[i];
@@ -277,6 +279,8 @@ void BoidSystem::_process_cpu(double delta) {
     }
 }
 
+namespace godot {
+
 // --- C++ Wrapper for CUDA C Interface ---
 // This function is called from _process when CUDA is available
 godot::Vector<godot::Vector3> calculate_boid_update_cuda(
@@ -342,10 +346,9 @@ godot::Vector<godot::Vector3> calculate_boid_update_cuda(
     }
 
     // 4. Convert Results back to Godot Types
-    // Use ptrw() for efficient writing if the vector was resized correctly
-    Vector3* write_ptr = host_new_velocities.ptrw();
+    // Use set() for safer assignment
     for(int i = 0; i < num_boids; ++i) {
-        write_ptr[i] = Vector3(c_new_velocities[i].x, c_new_velocities[i].y, c_new_velocities[i].z);
+        host_new_velocities.set(i, Vector3(c_new_velocities[i].x, c_new_velocities[i].y, c_new_velocities[i].z));
     }
 
     return host_new_velocities;
@@ -356,3 +359,5 @@ bool is_cuda_available() {
     // Call the C interface function
     return is_cuda_available_c_interface();
 }
+
+} // namespace godot

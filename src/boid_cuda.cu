@@ -5,12 +5,6 @@
 #include <stdio.h> // For basic error printing
 #include <vector> // Keep for temporary host storage if needed inside C interface
 
-typedef struct {
-    float x;
-    float y;
-    float z;
-} float3_simple;
-
 __device__ float3_simple operator+(const float3_simple& a, const float3_simple& b) {
     return {a.x + b.x, a.y + b.y, a.z + b.z};
 }
@@ -160,7 +154,7 @@ static int HandleCudaError(cudaError_t err, const char *file, int line) {
 
 
 // --- C-style interface function implementation ---
-extern "C" int calculate_boid_update_cuda_c_interface(
+int calculate_boid_update_cuda_c_interface(
     const float3_simple* host_positions,
     const float3_simple* host_current_velocities,
     float3_simple* host_new_velocities, // Output parameter
@@ -240,7 +234,7 @@ extern "C" int calculate_boid_update_cuda_c_interface(
 
 
 // --- Implementation for is_cuda_available_c_interface ---
-extern "C" bool is_cuda_available_c_interface() {
+bool is_cuda_available_c_interface() {
     int device_count = 0;
     cudaError_t err = cudaGetDeviceCount(&device_count);
     if (err != cudaSuccess) {
