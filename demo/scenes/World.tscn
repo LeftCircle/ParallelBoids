@@ -1,0 +1,34 @@
+[gd_scene load_steps=6 format=3 uid="uid://chkwbi68gb01p"]
+
+[ext_resource type="Script" uid="uid://cves8uxvjat84" path="res://scenes/world.gd" id="1_32lhk"]
+[ext_resource type="PackedScene" uid="uid://lp3cj5uk0fr4" path="res://scenes/Boid.tscn" id="1_kqs1s"]
+
+[sub_resource type="BoidOOP" id="BoidOOP_32lhk"]
+velocity = Vector3(0, 1, 0)
+neighbor_distance = 10.0
+
+[sub_resource type="BoidOOP" id="BoidOOP_7g83o"]
+position = Vector3(1, 1, 0)
+neighbor_distance = 10.0
+
+[sub_resource type="BoidOOP" id="BoidOOP_d1c63"]
+velocity = Vector3(-1, 1, 0)
+neighbor_distance = 10.0
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_32lhk")
+spawn_region = AABB(-50, -50, -50, 100, 100, 100)
+
+[node name="Boid" parent="." instance=ExtResource("1_kqs1s")]
+boid_oop = SubResource("BoidOOP_32lhk")
+
+[node name="Boid2" parent="." instance=ExtResource("1_kqs1s")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.33351, 0, 0)
+boid_oop = SubResource("BoidOOP_7g83o")
+
+[node name="Boid3" parent="." instance=ExtResource("1_kqs1s")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.24108, 0, 0)
+boid_oop = SubResource("BoidOOP_d1c63")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16.0987)

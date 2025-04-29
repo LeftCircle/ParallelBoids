@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3 uid="uid://lp3cj5uk0fr4"]
+
+[ext_resource type="Script" uid="uid://c402w7oy751yi" path="res://scenes/boid.gd" id="1_3wvxu"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_csibm"]
+top_radius = 0.0
+
+[node name="Boid" type="Node3D"]
+script = ExtResource("1_3wvxu")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -0.461952)
+mesh = SubResource("CylinderMesh_csibm")
