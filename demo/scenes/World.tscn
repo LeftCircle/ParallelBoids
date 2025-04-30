@@ -5,7 +5,9 @@
 
 [sub_resource type="BoidOOP" id="BoidOOP_32lhk"]
 velocity = Vector3(0, 1, 0)
+max_speed = 15.0
 neighbor_distance = 10.0
+separation_weight = 10.0
 
 [sub_resource type="BoidOOP" id="BoidOOP_7g83o"]
 position = Vector3(1, 1, 0)
