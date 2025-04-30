@@ -18,6 +18,8 @@ protected:
 
 private:
 	TypedArray<BoidOOP> boid_oops;
+	Vector3 min_bound = Vector3(-100, -100, -100);
+	Vector3 max_bound = Vector3(100, 100, 100);
 
     // Member vectors for CUDA data transfer to avoid re-allocation
     std::vector<float3_simple> cuda_positions;
@@ -37,7 +39,8 @@ private:
     );
 
     // Add the CPU processing function declaration
-    void _process_cpu(double delta);
+    //void _process_cpu(double delta);
+	Vector3 wrap_position(Vector3 pos) const;
 
 public:
     BoidSystem();
@@ -51,6 +54,7 @@ public:
 
 	void update_boids_cpu(double delta);
     void update_boids_cuda(double delta);
+	void set_bounds(const Vector3 &min, const Vector3 &max) { min_bound = min; max_bound = max; }
 	TypedArray<BoidOOP> get_boids() { return boid_oops; }
 
 };

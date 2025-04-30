@@ -17,6 +17,7 @@ void BoidSystem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("register_boid", "boid"), &BoidSystem::register_boid);
 	ClassDB::bind_method(D_METHOD("unregister_boid", "boid"), &BoidSystem::unregister_boid);
 	ClassDB::bind_method(D_METHOD("get_boids"), &BoidSystem::get_boids);
+	ClassDB::bind_method(D_METHOD("set_bounds", "min", "max"), &BoidSystem::set_bounds);
 	
 }
 
@@ -56,6 +57,9 @@ void BoidSystem::update_boids_cpu(double delta) {
 			BoidOOP* current_boid = current_boid_ref.ptr();
 			TypedArray<BoidOOP> neighbors = current_boid->find_neighbors(boid_oops);
 			current_boid->update(delta, neighbors);
+			Vector3 current_pos = current_boid->get_position();
+			current_pos = wrap_position(current_pos);
+			current_boid->set_position(current_pos);
 		}
 	}
 }
@@ -126,7 +130,9 @@ void BoidSystem::update_boids_cuda(double delta) {
 
 			// Update the boid's position using the new velocity
 			Vector3 current_pos = current_boid->get_position();
-			current_boid->set_position(current_pos + new_vel * (float)delta);
+			Vector3 next_pos = current_pos + new_vel * (float)delta;
+			next_pos = wrap_position(next_pos);
+			current_boid->set_position(next_pos);
 		}
 	}
 }
@@ -205,93 +211,136 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 	return host_new_velocities;
 }
 
-// --- CPU Boid Logic ---
-void BoidSystem::_process_cpu(double delta) {
-	TypedArray<BoidOOP> current_boids = boid_oops; // Work on a copy? Or directly? Be careful if modifying array during iteration.
-	//Vector<Vector3> forces;
-	//forces.resize(current_boids.size()); // Pre-allocate forces vector
-	TypedArray<Vector3> forces;
-	forces.resize(current_boids.size()); // Pre-allocate forces vector
+Vector3 BoidSystem::wrap_position(Vector3 pos) const {
+    Vector3 size = max_bound - min_bound;
 
-	for (int i = 0; i < current_boids.size(); ++i) {
-		Variant v_i = current_boids[i];
-		BoidOOP *boid_i = Object::cast_to<BoidOOP>(v_i.operator Object*());
-		if (!boid_i) continue;
+    // Handle potential zero size dimensions to avoid division by zero in fmod
+    if (size.x <= 0.0f) {
+        pos.x = min_bound.x;
+    } else {
+        if (pos.x < min_bound.x) {
+            // Wrap from left to right
+            pos.x = max_bound.x - fmod(min_bound.x - pos.x, size.x);
+        } else if (pos.x > max_bound.x) {
+            // Wrap from right to left
+            pos.x = min_bound.x + fmod(pos.x - max_bound.x, size.x);
+        }
+        // Ensure the result is exactly within bounds if fmod results in boundary value due to precision
+         if (pos.x == max_bound.x) pos.x = min_bound.x;
+    }
 
-		Vector3 separation_force;
-		Vector3 alignment_sum;
-		Vector3 cohesion_center;
-		int neighbor_count = 0;
+    if (size.y <= 0.0f) {
+        pos.y = min_bound.y;
+    } else {
+        if (pos.y < min_bound.y) {
+            pos.y = max_bound.y - fmod(min_bound.y - pos.y, size.y);
+        } else if (pos.y > max_bound.y) {
+            pos.y = min_bound.y + fmod(pos.y - max_bound.y, size.y);
+        }
+         if (pos.y == max_bound.y) pos.y = min_bound.y;
+    }
 
-		for (int j = 0; j < current_boids.size(); ++j) {
-			if (i == j) continue;
+    if (size.z <= 0.0f) {
+        pos.z = min_bound.z;
+    } else {
+        if (pos.z < min_bound.z) {
+            pos.z = max_bound.z - fmod(min_bound.z - pos.z, size.z);
+        } else if (pos.z > max_bound.z) {
+            pos.z = min_bound.z + fmod(pos.z - max_bound.z, size.z);
+        }
+         if (pos.z == max_bound.z) pos.z = min_bound.z;
+    }
 
-			Variant v_j = current_boids[j];
-			BoidOOP *boid_j = Object::cast_to<BoidOOP>(v_j.operator Object*());
-			if (!boid_j) continue;
-
-			float dist_sq = boid_i->get_position().distance_squared_to(boid_j->get_position());
-
-			if (dist_sq > 0 && dist_sq < 5.0f * 5.0f) {
-				neighbor_count++;
-				// Separation
-				Vector3 diff = boid_i->get_position() - boid_j->get_position();
-				// Normalize and weight by 1/distance (stronger when closer)
-				separation_force += diff.normalized() / sqrt(dist_sq); // Using sqrt here for 1/dist weighting
-
-				// Alignment
-				alignment_sum += boid_j->get_velocity();
-
-				// Cohesion
-				cohesion_center += boid_j->get_position();
-			}
-		}
-
-		Vector3 total_force;
-		if (neighbor_count > 0) {
-			// Finalize Separation
-			separation_force = (separation_force / neighbor_count).normalized() * 5.0f;
-			separation_force = (separation_force - boid_i->get_velocity()) * 1.5f; // Steering force
-
-			// Finalize Alignment
-			alignment_sum = (alignment_sum / neighbor_count).normalized() * 5.0f;
-			alignment_sum = (alignment_sum - boid_i->get_velocity()) * 1.0f; // Steering force
-
-			// Finalize Cohesion
-			cohesion_center /= neighbor_count;
-			Vector3 desired_cohesion = (cohesion_center - boid_i->get_position()).normalized() * 5.0f;
-			desired_cohesion = (desired_cohesion - boid_i->get_velocity()) * 1.0f; // Steering force
-
-			total_force = separation_force + alignment_sum + desired_cohesion;
-
-			// Limit Force
-			if (total_force.length_squared() > 10.0f * 10.0f) {
-				total_force = total_force.normalized() * 10.0f;
-			}
-		}
-		forces[i] = total_force; // Store calculated force
-	}
-
-	// Apply forces and update positions
-	for (int i = 0; i < current_boids.size(); ++i) {
-		Variant v = current_boids[i];
-		BoidOOP *boid = Object::cast_to<BoidOOP>(v.operator Object*());
-		if (boid) {
-			Vector3 velocity = boid->get_velocity();
-			// Acceleration = Force / Mass (assume mass = 1)
-			Vector3 acceleration = forces[i];
-			velocity += acceleration * delta;
-
-			// Limit Speed
-			if (velocity.length_squared() > 5.0f * 5.0f) {
-				velocity = velocity.normalized() * 5.0f;
-			}
-
-			boid->set_velocity(velocity);
-			boid->set_position(boid->get_position() + velocity * delta);
-		}
-	}
+    return pos;
 }
+
+// // --- CPU Boid Logic ---
+// void BoidSystem::_process_cpu(double delta) {
+// 	TypedArray<BoidOOP> current_boids = boid_oops; // Work on a copy? Or directly? Be careful if modifying array during iteration.
+// 	//Vector<Vector3> forces;
+// 	//forces.resize(current_boids.size()); // Pre-allocate forces vector
+// 	TypedArray<Vector3> forces;
+// 	forces.resize(current_boids.size()); // Pre-allocate forces vector
+
+// 	for (int i = 0; i < current_boids.size(); ++i) {
+// 		Variant v_i = current_boids[i];
+// 		BoidOOP *boid_i = Object::cast_to<BoidOOP>(v_i.operator Object*());
+// 		if (!boid_i) continue;
+
+// 		Vector3 separation_force;
+// 		Vector3 alignment_sum;
+// 		Vector3 cohesion_center;
+// 		int neighbor_count = 0;
+
+// 		for (int j = 0; j < current_boids.size(); ++j) {
+// 			if (i == j) continue;
+
+// 			Variant v_j = current_boids[j];
+// 			BoidOOP *boid_j = Object::cast_to<BoidOOP>(v_j.operator Object*());
+// 			if (!boid_j) continue;
+
+// 			float dist_sq = boid_i->get_position().distance_squared_to(boid_j->get_position());
+
+// 			if (dist_sq > 0 && dist_sq < 5.0f * 5.0f) {
+// 				neighbor_count++;
+// 				// Separation
+// 				Vector3 diff = boid_i->get_position() - boid_j->get_position();
+// 				// Normalize and weight by 1/distance (stronger when closer)
+// 				separation_force += diff.normalized() / sqrt(dist_sq); // Using sqrt here for 1/dist weighting
+
+// 				// Alignment
+// 				alignment_sum += boid_j->get_velocity();
+
+// 				// Cohesion
+// 				cohesion_center += boid_j->get_position();
+// 			}
+// 		}
+
+// 		Vector3 total_force;
+// 		if (neighbor_count > 0) {
+// 			// Finalize Separation
+// 			separation_force = (separation_force / neighbor_count).normalized() * 5.0f;
+// 			separation_force = (separation_force - boid_i->get_velocity()) * 1.5f; // Steering force
+
+// 			// Finalize Alignment
+// 			alignment_sum = (alignment_sum / neighbor_count).normalized() * 5.0f;
+// 			alignment_sum = (alignment_sum - boid_i->get_velocity()) * 1.0f; // Steering force
+
+// 			// Finalize Cohesion
+// 			cohesion_center /= neighbor_count;
+// 			Vector3 desired_cohesion = (cohesion_center - boid_i->get_position()).normalized() * 5.0f;
+// 			desired_cohesion = (desired_cohesion - boid_i->get_velocity()) * 1.0f; // Steering force
+
+// 			total_force = separation_force + alignment_sum + desired_cohesion;
+
+// 			// Limit Force
+// 			if (total_force.length_squared() > 10.0f * 10.0f) {
+// 				total_force = total_force.normalized() * 10.0f;
+// 			}
+// 		}
+// 		forces[i] = total_force; // Store calculated force
+// 	}
+
+// 	// Apply forces and update positions
+// 	for (int i = 0; i < current_boids.size(); ++i) {
+// 		Variant v = current_boids[i];
+// 		BoidOOP *boid = Object::cast_to<BoidOOP>(v.operator Object*());
+// 		if (boid) {
+// 			Vector3 velocity = boid->get_velocity();
+// 			// Acceleration = Force / Mass (assume mass = 1)
+// 			Vector3 acceleration = forces[i];
+// 			velocity += acceleration * delta;
+
+// 			// Limit Speed
+// 			if (velocity.length_squared() > 5.0f * 5.0f) {
+// 				velocity = velocity.normalized() * 5.0f;
+// 			}
+
+// 			boid->set_velocity(velocity);
+// 			boid->set_position(boid->get_position() + velocity * delta);
+// 		}
+// 	}
+// }
 
 // --- C++ Wrapper for CUDA Availability Check ---
 namespace godot {

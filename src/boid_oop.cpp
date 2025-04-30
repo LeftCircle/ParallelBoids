@@ -57,47 +57,121 @@ TypedArray<BoidOOP> BoidOOP::find_neighbors(const TypedArray<BoidOOP>& boids) co
 	return neighbors;
 }
 
+void BoidOOP::update(double delta, const TypedArray<BoidOOP>& neighbors){
 
-void BoidOOP::update(double delta, const TypedArray<BoidOOP>& neighbors) {
-	Vector3 separation, alignment, cohesion;
-	int neighbor_count = 0;
+	Vector3 separation_force = Vector3(0, 0, 0);
+	Vector3 alignment_sum = Vector3(0, 0, 0);
+	Vector3 cohesion_center = Vector3(0, 0, 0);; // Center of mass for cohesion
 	int n_neighbors = neighbors.size(); // Use the passed neighbors array
 
 	for (int i = 0; i < n_neighbors; ++i) {
-			Variant v = neighbors[i];
-			BoidOOP* other = Object::cast_to<BoidOOP>(v.operator Object*());
-			if (!other) continue; // Should not happen if find_neighbors is correct
+		Variant v = neighbors[i];
+		BoidOOP* other = Object::cast_to<BoidOOP>(v.operator Object*());
 
-		float dist = position.distance_to(other->get_position());
-		// Avoid division by zero or very small distances
-		if (dist > CMP_EPSILON) {
-				separation += (position - other->get_position()) / (dist * dist); 
+		// Calculate distance squared
+		Vector3 diff = position - other->position;
+		float dist_sq = diff.length_squared();
+		
+		// 1. Separation: Steer away from neighbors
+		separation_force = separation_force + (diff / dist_sq); 
+		// 2. Alignment: Steer towards average neighbor velocity
+		alignment_sum = alignment_sum + other->velocity;
+
+		// 3. Cohesion: Steer towards average neighbor position (center of mass)
+		cohesion_center = cohesion_center + other->position;
+	}
+
+	Vector3 total_force = Vector3(0, 0, 0);
+
+	if (n_neighbors > 0) {
+		// Average separation force (optional, can be strong)
+		separation_force = separation_force / n_neighbors;
+		separation_force = separation_force - velocity; // Steering force
+		separation_force = separation_force * separation_weight;
+
+		alignment_sum = alignment_sum / n_neighbors; // Average velocity
+		alignment_sum = alignment_sum - velocity; // Steering force
+		alignment_sum = alignment_sum * alignment_weight;
+
+		cohesion_center = cohesion_center / n_neighbors; // Center of mass
+		Vector3 desired_cohesion = cohesion_center - position; // Vector towards center
+		desired_cohesion = desired_cohesion - velocity; // Steering force
+		desired_cohesion = desired_cohesion * cohesion_weight;
+
+		// --- Combine Forces ---
+		total_force = separation_force + alignment_sum + desired_cohesion;
+
+		// --- Limit Force ---
+		float force_mag_sq = total_force.length_squared();
+		if (force_mag_sq > max_force * max_force) {
+			total_force = total_force.normalized() * max_force;
 		}
-		alignment += other->get_velocity();
-		cohesion += other->get_position();
-		neighbor_count++;
 	}
 
-	if (neighbor_count > 0) {
-		// Average the forces/positions
-		separation /= neighbor_count;
-		alignment /= neighbor_count;
-		cohesion /= neighbor_count;
+	// --- Apply Force & Update Velocity ---
+	// Acceleration = Force / Mass (assume mass = 1 for simplicity)
+	Vector3 acceleration = total_force; // If mass is 1
+	velocity += acceleration * delta;
 
-		// Apply weights and calculate final vectors
-		separation *= separation_weight;
-		alignment = (alignment - velocity) * alignment_weight;
-		cohesion = (cohesion - position) * cohesion_weight;
-
-		velocity += separation + alignment + cohesion;
-	}
-
-	// Clamp speed
-	if (velocity.length_squared() > max_speed * max_speed) {
+	// --- Limit Speed (Max and Min) ---
+	float speed_sq = velocity.length_squared();
+	if (speed_sq > max_speed * max_speed) {
 		velocity = velocity.normalized() * max_speed;
+	} else if (speed_sq < min_speed * min_speed) {
+		// Only apply min speed if the boid is actually moving (speed_sq > epsilon)
+		// to avoid giving stationary boids a random direction.
+		// A very small epsilon prevents issues with floating point inaccuracies near zero.
+		float epsilon_sq = 1e-9f; // Square of a small epsilon
+		if (speed_sq > epsilon_sq) {
+			velocity = velocity.normalized() * min_speed;
+		} else {
+			// If velocity is essentially zero, leave it zero.
+			velocity = {0.0f, 0.0f, 0.0f};
+		}
 	}
-	position += velocity * (float)delta;
 }
+
+
+// void BoidOOP::update(double delta, const TypedArray<BoidOOP>& neighbors) {
+// 	Vector3 separation, alignment, cohesion;
+// 	int neighbor_count = 0;
+// 	int n_neighbors = neighbors.size(); // Use the passed neighbors array
+
+// 	for (int i = 0; i < n_neighbors; ++i) {
+// 			Variant v = neighbors[i];
+// 			BoidOOP* other = Object::cast_to<BoidOOP>(v.operator Object*());
+// 			if (!other) continue; // Should not happen if find_neighbors is correct
+
+// 		float dist = position.distance_to(other->get_position());
+// 		// Avoid division by zero or very small distances
+// 		if (dist > CMP_EPSILON) {
+// 				separation += (position - other->get_position()) / (dist * dist); 
+// 		}
+// 		alignment += other->get_velocity();
+// 		cohesion += other->get_position();
+// 		neighbor_count++;
+// 	}
+
+// 	if (neighbor_count > 0) {
+// 		// Average the forces/positions
+// 		separation /= neighbor_count;
+// 		alignment /= neighbor_count;
+// 		cohesion /= neighbor_count;
+
+// 		// Apply weights and calculate final vectors
+// 		separation *= separation_weight;
+// 		alignment = (alignment - velocity) * alignment_weight;
+// 		cohesion = (cohesion - position) * cohesion_weight;
+
+// 		velocity += separation + alignment + cohesion;
+// 	}
+
+// 	// Clamp speed
+// 	if (velocity.length_squared() > max_speed * max_speed) {
+// 		velocity = velocity.normalized() * max_speed;
+// 	}
+// 	position += velocity * (float)delta;
+// }
 
 void BoidOOP::set_position(const Vector3 &p_position) {
 	position = p_position;

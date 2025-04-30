@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://chkwbi68gb01p"]
+[gd_scene load_steps=7 format=3 uid="uid://chkwbi68gb01p"]
 
 [ext_resource type="Script" uid="uid://cves8uxvjat84" path="res://scenes/world.gd" id="1_32lhk"]
 [ext_resource type="PackedScene" uid="uid://lp3cj5uk0fr4" path="res://scenes/Boid.tscn" id="1_kqs1s"]
@@ -14,9 +14,13 @@ neighbor_distance = 10.0
 velocity = Vector3(-1, 1, 0)
 neighbor_distance = 10.0
 
+[sub_resource type="BoxMesh" id="BoxMesh_32lhk"]
+size = Vector3(250, 250, 250)
+
 [node name="World" type="Node3D"]
 script = ExtResource("1_32lhk")
-spawn_region = AABB(-50, -50, -50, 100, 100, 100)
+boids_to_increase_by = 10000
+boid_range = Vector2i(10000, 1000000)
 
 [node name="Boid" parent="." instance=ExtResource("1_kqs1s")]
 boid_oop = SubResource("BoidOOP_32lhk")
@@ -30,4 +34,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.24108, 0, 0)
 boid_oop = SubResource("BoidOOP_d1c63")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 16.0987)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 230.825)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_32lhk")
