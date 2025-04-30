@@ -9,6 +9,8 @@ void BoidOOP::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_velocity"), &BoidOOP::get_velocity);
 	ClassDB::bind_method(D_METHOD("set_max_speed", "max_speed"), &BoidOOP::set_max_speed);
 	ClassDB::bind_method(D_METHOD("get_max_speed"), &BoidOOP::get_max_speed);
+	ClassDB::bind_method(D_METHOD("set_min_speed", "min_speed"), &BoidOOP::set_min_speed);
+	ClassDB::bind_method(D_METHOD("get_min_speed"), &BoidOOP::get_min_speed);
 	ClassDB::bind_method(D_METHOD("set_neighbor_distance", "distance"), &BoidOOP::set_neighbor_distance);
 	ClassDB::bind_method(D_METHOD("get_neighbor_distance"), &BoidOOP::get_neighbor_distance);
 	ClassDB::bind_method(D_METHOD("set_separation_weight", "weight"), &BoidOOP::set_separation_weight);
@@ -17,21 +19,26 @@ void BoidOOP::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_alignment_weight"), &BoidOOP::get_alignment_weight);
 	ClassDB::bind_method(D_METHOD("set_cohesion_weight", "weight"), &BoidOOP::set_cohesion_weight);
 	ClassDB::bind_method(D_METHOD("get_cohesion_weight"), &BoidOOP::get_cohesion_weight);
+	ClassDB::bind_method(D_METHOD("set_max_force", "max_force"), &BoidOOP::set_max_force);
+	ClassDB::bind_method(D_METHOD("get_max_force"), &BoidOOP::get_max_force);
 	ClassDB::bind_method(D_METHOD("update", "delta", "neighbors"), &BoidOOP::update);
 	ClassDB::bind_method(D_METHOD("find_neighbors", "boids"), &BoidOOP::find_neighbors);
+	
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "position"), "set_position", "get_position");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "velocity"), "set_velocity", "get_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_speed"), "set_max_speed", "get_max_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "min_speed"), "set_min_speed", "get_min_speed");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "neighbor_distance"), "set_neighbor_distance", "get_neighbor_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "separation_weight"), "set_separation_weight", "get_separation_weight");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "alignment_weight"), "set_alignment_weight", "get_alignment_weight");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cohesion_weight"), "set_cohesion_weight", "get_cohesion_weight");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_force"), "set_max_force", "get_max_force");
 }
 
 BoidOOP::BoidOOP() {
 	position = Vector3(0, 0, 0);
-    velocity = Vector3(0, 0, 0);
+    velocity = Vector3(UtilityFunctions::randf() * 2.0 - 1.0, UtilityFunctions::randf() * 2.0 - 1.0, UtilityFunctions::randf() * 2.0 - 1.0).normalized() * ((max_speed + min_speed) / 2.0);
 }
 BoidOOP::~BoidOOP() {}
 
@@ -64,7 +71,7 @@ void BoidOOP::update(double delta, const TypedArray<BoidOOP>& neighbors) {
 		float dist = position.distance_to(other->get_position());
 		// Avoid division by zero or very small distances
 		if (dist > CMP_EPSILON) {
-				separation += (position - other->get_position()).normalized() / dist; 
+				separation += (position - other->get_position()) / (dist * dist); 
 		}
 		alignment += other->get_velocity();
 		cohesion += other->get_position();
@@ -79,8 +86,8 @@ void BoidOOP::update(double delta, const TypedArray<BoidOOP>& neighbors) {
 
 		// Apply weights and calculate final vectors
 		separation *= separation_weight;
-		alignment = (alignment - velocity).normalized() * alignment_weight; 
-		cohesion = (cohesion - position).normalized() * cohesion_weight;
+		alignment = (alignment - velocity) * alignment_weight;
+		cohesion = (cohesion - position) * cohesion_weight;
 
 		velocity += separation + alignment + cohesion;
 	}
@@ -114,6 +121,14 @@ void BoidOOP::set_max_speed(float p_max_speed) {
 
 float BoidOOP::get_max_speed() const {
 	return max_speed;
+}
+
+void BoidOOP::set_min_speed(float p_speed) {
+	min_speed = p_speed;
+}
+
+float BoidOOP::get_min_speed() const {
+	return min_speed;
 }
 
 void BoidOOP::set_neighbor_distance(float p_distance) {

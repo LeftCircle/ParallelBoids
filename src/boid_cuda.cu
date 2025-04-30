@@ -51,6 +51,7 @@ __global__ void calculate_boid_forces_kernel(
 	float alignment_weight,
 	float cohesion_weight,
 	float max_speed,
+	float min_speed, // <-- Add min_speed parameter
 	float max_force
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -121,10 +122,21 @@ __global__ void calculate_boid_forces_kernel(
 		float3_simple acceleration = total_force; // If mass is 1
 		vel = vel + acceleration * delta_time;
 
-		// --- Limit Speed ---
+		// --- Limit Speed (Max and Min) ---
 		float speed_sq = length_squared(vel);
 		if (speed_sq > max_speed * max_speed) {
 			vel = normalize(vel) * max_speed;
+		} else if (speed_sq < min_speed * min_speed) {
+			// Only apply min speed if the boid is actually moving (speed_sq > epsilon)
+			// to avoid giving stationary boids a random direction.
+			// A very small epsilon prevents issues with floating point inaccuracies near zero.
+			float epsilon_sq = 1e-9f; // Square of a small epsilon
+			if (speed_sq > epsilon_sq) {
+				vel = normalize(vel) * min_speed;
+			} else {
+				// If velocity is essentially zero, leave it zero.
+				vel = {0.0f, 0.0f, 0.0f};
+			}
 		}
 
 		// Write the final calculated velocity for this boid
@@ -156,6 +168,7 @@ int calculate_boid_update_cuda_c_interface(
 	float alignment_weight,
 	float cohesion_weight,
 	float max_speed,
+	float min_speed, // <-- Add min_speed parameter
 	float max_force
 ) {
 	if (num_boids == 0) {
@@ -196,6 +209,7 @@ int calculate_boid_update_cuda_c_interface(
 		alignment_weight,
 		cohesion_weight,
 		max_speed,
+		min_speed, // <-- Pass min_speed to kernel
 		max_force
 	);
 

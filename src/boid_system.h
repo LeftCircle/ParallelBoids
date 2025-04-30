@@ -32,6 +32,7 @@ private:
         float alignment_weight,
         float cohesion_weight,
         float max_speed,
+        float min_speed, // <-- Add min_speed parameter
         float max_force
     );
 
@@ -48,6 +49,7 @@ public:
     void register_boid(const Ref<BoidOOP> &boid); 
     void unregister_boid(const Ref<BoidOOP> &boid);
 
+	void update_boids_cpu(double delta);
     void update_boids_cuda(double delta);
 	TypedArray<BoidOOP> get_boids() { return boid_oops; }
 

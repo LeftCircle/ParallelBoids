@@ -27,6 +27,7 @@ int calculate_boid_update_cuda_c_interface(
     float alignment_weight,
     float cohesion_weight,
     float max_speed,
+    float min_speed, // <-- Add min_speed parameter
     float max_force
 );
 

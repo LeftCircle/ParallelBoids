@@ -12,7 +12,7 @@
 using namespace godot;
 
 void BoidSystem::_bind_methods() {
-	//ClassDB::bind_method(D_METHOD("update_boids_oop", "delta"), &BoidSystem::update_boids_oop);
+	ClassDB::bind_method(D_METHOD("update_boids_cpu", "delta"), &BoidSystem::update_boids_cpu);
 	ClassDB::bind_method(D_METHOD("update_boids_cuda", "delta"), &BoidSystem::update_boids_cuda);
 	ClassDB::bind_method(D_METHOD("register_boid", "boid"), &BoidSystem::register_boid);
 	ClassDB::bind_method(D_METHOD("unregister_boid", "boid"), &BoidSystem::unregister_boid);
@@ -49,6 +49,17 @@ void BoidSystem::unregister_boid(const Ref<BoidOOP> &boid) {
 	}
 }
 
+void BoidSystem::update_boids_cpu(double delta) {
+	for (int i = 0; i < boid_oops.size(); ++i) {
+		Ref<BoidOOP> current_boid_ref = boid_oops[i];
+		if (current_boid_ref.is_valid()) {
+			BoidOOP* current_boid = current_boid_ref.ptr();
+			TypedArray<BoidOOP> neighbors = current_boid->find_neighbors(boid_oops);
+			current_boid->update(delta, neighbors);
+		}
+	}
+}
+
 void BoidSystem::update_boids_cuda(double delta) {
 	int num_boids = boid_oops.size();
 	if (num_boids == 0) {
@@ -61,7 +72,8 @@ void BoidSystem::update_boids_cuda(double delta) {
 	float alignment_w = 1.0f;
 	float cohesion_w = 1.0f;
 	float max_speed = 5.0f;
-	float max_force = 10.0f; // Example max force
+	float min_speed = 0.5f; 
+	float max_force = 1000.0f; // Example max force
 
 	Ref<BoidOOP> first_boid_ref = boid_oops[0];
 	if (first_boid_ref.is_valid()) {
@@ -71,7 +83,8 @@ void BoidSystem::update_boids_cuda(double delta) {
 		alignment_w = first_boid->get_alignment_weight();
 		cohesion_w = first_boid->get_cohesion_weight();
 		max_speed = first_boid->get_max_speed();
-		// print_line("BoidSystem: First boid seperation weight = ", separation_w);
+		min_speed = first_boid->get_min_speed(); // <-- Get min_speed from boid
+		// max_force = first_boid->get_max_force(); // Assuming max_force is also a property
 	}
 
 	// --- Call internal CUDA function --- 
@@ -84,6 +97,7 @@ void BoidSystem::update_boids_cuda(double delta) {
 			alignment_w,
 			cohesion_w,
 			max_speed,
+			min_speed, // <-- Pass min_speed
 			max_force
 		);
 	} catch (const std::exception& e) {
@@ -125,6 +139,7 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 	float alignment_weight,
 	float cohesion_weight,
 	float max_speed,
+	float min_speed, // <-- Add min_speed parameter
 	float max_force
 ) {
 	int num_boids = boid_oops.size();
@@ -171,6 +186,7 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 		alignment_weight,
 		cohesion_weight,
 		max_speed,
+		min_speed, // <-- Pass min_speed to C interface
 		max_force
 	);
 
