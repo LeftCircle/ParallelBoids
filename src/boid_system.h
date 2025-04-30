@@ -26,7 +26,7 @@ public:
     ~BoidSystem();
 
     void _ready() override;
-    void _process(double delta) override;
+    //void _process(double delta) override;
 
     void register_boid(const Ref<BoidOOP> &boid); 
     void unregister_boid(const Ref<BoidOOP> &boid);

@@ -29,44 +29,44 @@ void BoidSystem::_ready() {
     boid_oops.clear();
 }
 
-void BoidSystem::_process(double delta) {
-    // Check CUDA availability once (maybe cache the result?)
-    bool use_cuda = is_cuda_available(); // Call the C++ wrapper
+// void BoidSystem::_process(double delta) {
+//     // Check CUDA availability once (maybe cache the result?)
+//     bool use_cuda = is_cuda_available(); // Call the C++ wrapper
 
-    if (use_cuda) {
-        // --- CUDA Path ---
-        // UtilityFunctions::print("Using CUDA for boid updates."); // Optional debug print
+//     if (use_cuda) {
+//         // --- CUDA Path ---
+//         // UtilityFunctions::print("Using CUDA for boid updates."); // Optional debug print
 
-        // Call the C++ wrapper function that uses the C interface
-        Vector<Vector3> new_velocities = calculate_boid_update_cuda(
-            boid_oops, delta,
-            5.0f, 1.5f, 1.0f, 1.0f,
-            5.0f, 10.0f
-        );
+//         // Call the C++ wrapper function that uses the C interface
+//         Vector<Vector3> new_velocities = calculate_boid_update_cuda(
+//             boid_oops, delta,
+//             5.0f, 1.5f, 1.0f, 1.0f,
+//             5.0f, 10.0f
+//         );
 
-        // Apply updates (ensure sizes match)
-        if (new_velocities.size() == boid_oops.size()) {
-            for (int i = 0; i < boid_oops.size(); ++i) {
-                Ref<BoidOOP> current_boid_ref = boid_oops[i];
-                if (current_boid_ref.is_valid()) {
-                    BoidOOP* current_boid = current_boid_ref.ptr();
-                    current_boid->set_velocity(new_velocities[i]);
-                    // Update position based on the *new* velocity
-                    current_boid->set_position(current_boid->get_position() + new_velocities[i] * delta);
-                }
-            }
-        } else {
-            UtilityFunctions::printerr("CUDA update returned incorrect number of velocities!");
-            // Fallback to CPU or handle error
-            _process_cpu(delta);
-        }
+//         // Apply updates (ensure sizes match)
+//         if (new_velocities.size() == boid_oops.size()) {
+//             for (int i = 0; i < boid_oops.size(); ++i) {
+//                 Ref<BoidOOP> current_boid_ref = boid_oops[i];
+//                 if (current_boid_ref.is_valid()) {
+//                     BoidOOP* current_boid = current_boid_ref.ptr();
+//                     current_boid->set_velocity(new_velocities[i]);
+//                     // Update position based on the *new* velocity
+//                     current_boid->set_position(current_boid->get_position() + new_velocities[i] * delta);
+//                 }
+//             }
+//         } else {
+//             UtilityFunctions::printerr("CUDA update returned incorrect number of velocities!");
+//             // Fallback to CPU or handle error
+//             _process_cpu(delta);
+//         }
 
-    } else {
-        // --- CPU Fallback Path ---
-        // UtilityFunctions::print("CUDA not available, using CPU for boid updates."); // Optional debug print
-        _process_cpu(delta);
-    }
-}
+//     } else {
+//         // --- CPU Fallback Path ---
+//         // UtilityFunctions::print("CUDA not available, using CPU for boid updates."); // Optional debug print
+//         _process_cpu(delta);
+//     }
+// }
 
 void BoidSystem::register_boid(const Ref<BoidOOP> &boid) {
 	bool found = false;
@@ -182,11 +182,6 @@ void BoidSystem::update_boids_cuda(double delta) {
             // Update the boid's position using the new velocity
             Vector3 current_pos = current_boid->get_position();
             current_boid->set_position(current_pos + new_vel * (float)delta);
-
-            // Note: If BoidOOP was a Node3D, you would update its transform here.
-            // Since it's a Resource, updating its internal state is sufficient.
-            // The system using these BoidOOP resources (e.g., visualizing them)
-            // would read the updated position/velocity.
         }
     }
 }

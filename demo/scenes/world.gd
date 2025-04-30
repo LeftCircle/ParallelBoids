@@ -3,9 +3,10 @@ extends Node3D
 @export var spawn_region : AABB
 
 func _ready() -> void:
-	for i in range(250):
+	for i in range(500):
 		var new_boid : GD_Boid = load("res://scenes/Boid.tscn").instantiate()
 		var boid_oop = BoidOOP.new()
+		boid_oop.separation_weight = 50
 		new_boid.boid_oop = boid_oop
 		new_boid.position.x = randf_range(spawn_region.position.x, spawn_region.end.x)
 		new_boid.position.y = randf_range(spawn_region.position.y, spawn_region.end.y)
@@ -15,4 +16,6 @@ func _ready() -> void:
 		add_child(new_boid)
 
 func _physics_process(delta: float) -> void:
-	BoidSystem.update_boids_oop(delta)
+	#BoidSystem.update_boids_oop(delta)
+	BoidSystem.update_boids_cuda(delta)
+	pass
