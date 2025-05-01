@@ -26,7 +26,7 @@ private:
 	Vector3 position;
 	Vector3 velocity;
 	float max_speed = 5.0f;
-	float min_speed = 0.5f; // <-- Add min_speed property
+	float min_speed = 0.5f;
 	float neighbor_distance = 5.0f;
 	float separation_weight = 3.0f;
 	float alignment_weight = 1.0f;
@@ -43,8 +43,8 @@ public:
 	Vector3 get_velocity() const;
 	void set_max_speed(float p_max_speed);
 	float get_max_speed() const;
-	void set_min_speed(float p_speed); // <-- Add setter
-	float get_min_speed() const;      // <-- Add getter
+	void set_min_speed(float p_speed); 
+	float get_min_speed() const;
 	void set_neighbor_distance(float p_distance);
 	float get_neighbor_distance() const;
 	void set_separation_weight(float p_weight);

@@ -3,12 +3,12 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/binder_common.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
-#include "boid_cuda.h" // Include CUDA interface
-#include <vector> // Include for std::vector
+#include "boid_cuda.h"
+#include <vector>
 
 namespace godot {
 
-class BoidOOP; // Forward declaration
+class BoidOOP; // Forward declaration of BoidOOP class
 
 class BoidSystem : public Node {
     GDCLASS(BoidSystem, Node);
@@ -26,7 +26,6 @@ private:
     std::vector<float3_simple> cuda_current_velocities;
     std::vector<float3_simple> cuda_new_velocities;
 
-    // Private helper for the actual CUDA calculation logic
     godot::Vector<godot::Vector3> _calculate_boid_update_cuda_internal(
         double delta_time,
         float neighbor_distance,
@@ -34,12 +33,10 @@ private:
         float alignment_weight,
         float cohesion_weight,
         float max_speed,
-        float min_speed, // <-- Add min_speed parameter
+        float min_speed,
         float max_force
     );
 
-    // Add the CPU processing function declaration
-    //void _process_cpu(double delta);
 	Vector3 wrap_position(Vector3 pos) const;
 
 public:
@@ -47,7 +44,6 @@ public:
     ~BoidSystem();
 
     void _ready() override;
-    //void _process(double delta) override;
 
     void register_boid(const Ref<BoidOOP> &boid); 
     void unregister_boid(const Ref<BoidOOP> &boid);

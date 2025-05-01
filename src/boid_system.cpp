@@ -1,13 +1,13 @@
 #include "boid_system.h"
 #include "boid_oop.h"
-#include "boid_cuda.h" // Include the C interface header
+#include "boid_cuda.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/time.hpp>
 
-#include <vector> // For std::vector
+#include <vector>
 
 using namespace godot;
 
@@ -31,20 +31,18 @@ void BoidSystem::_ready() {
 }
 
 void BoidSystem::register_boid(const Ref<BoidOOP> &boid) {
-	boid_oops.push_back(boid); // Add the boid to the array
-	// No need to resize CUDA vectors here, resize happens in the update function
+	boid_oops.push_back(boid);
 }
 
 void BoidSystem::unregister_boid(const Ref<BoidOOP> &boid) {
 	if (boid.is_null()) {
-		return; // Cannot unregister null
+		return;
 	}
 
 	for (int i = 0; i < boid_oops.size(); ++i) {
 		Ref<BoidOOP> existing_boid_ref = boid_oops[i];
 		if (existing_boid_ref == boid) {
 			boid_oops.remove_at(i);
-			// No need to resize CUDA vectors here, resize happens in the update function
 			break;
 		}
 	}
@@ -70,14 +68,13 @@ void BoidSystem::update_boids_cuda(double delta) {
 		return;
 	}
 
-	// --- Get Parameters (Example: Use first boid's parameters) ---
 	float neighbor_dist = 5.0f;
 	float separation_w = 1.5f;
 	float alignment_w = 1.0f;
 	float cohesion_w = 1.0f;
 	float max_speed = 5.0f;
 	float min_speed = 0.5f; 
-	float max_force = 1000.0f; // Example max force
+	float max_force = 30.0f;
 
 	Ref<BoidOOP> first_boid_ref = boid_oops[0];
 	if (first_boid_ref.is_valid()) {
@@ -87,11 +84,10 @@ void BoidSystem::update_boids_cuda(double delta) {
 		alignment_w = first_boid->get_alignment_weight();
 		cohesion_w = first_boid->get_cohesion_weight();
 		max_speed = first_boid->get_max_speed();
-		min_speed = first_boid->get_min_speed(); // <-- Get min_speed from boid
-		// max_force = first_boid->get_max_force(); // Assuming max_force is also a property
+		min_speed = first_boid->get_min_speed();
+		max_force = first_boid->get_max_force();
 	}
 
-	// --- Call internal CUDA function --- 
 	godot::Vector<godot::Vector3> new_velocities;
 	try {
 		new_velocities = _calculate_boid_update_cuda_internal(
@@ -101,7 +97,7 @@ void BoidSystem::update_boids_cuda(double delta) {
 			alignment_w,
 			cohesion_w,
 			max_speed,
-			min_speed, // <-- Pass min_speed
+			min_speed,
 			max_force
 		);
 	} catch (const std::exception& e) {
@@ -149,42 +145,38 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 	float max_force
 ) {
 	int num_boids = boid_oops.size();
-	godot::Vector<godot::Vector3> host_new_velocities; // Godot Vector for return
+	godot::Vector<godot::Vector3> host_new_velocities;
 	host_new_velocities.resize(num_boids);
 
 	if (num_boids == 0) {
 		return host_new_velocities;
 	}
 
-	// 1. Ensure member vectors have the correct size
 	if (cuda_positions.size() != num_boids) {
 		cuda_positions.resize(num_boids);
 		cuda_current_velocities.resize(num_boids);
 		cuda_new_velocities.resize(num_boids);
 	}
 
-	// 2. Prepare Host Data (Populate member vectors)
 	for (int i = 0; i < num_boids; ++i) {
 		Variant v = boid_oops[i];
 		BoidOOP* boid_ptr = Object::cast_to<BoidOOP>(v.operator Object*());
-		if (boid_ptr) { // Check if cast is successful
+		if (boid_ptr) {
 			Vector3 pos = boid_ptr->get_position();
 			Vector3 vel = boid_ptr->get_velocity();
 			cuda_positions[i] = {pos.x, pos.y, pos.z};
 			cuda_current_velocities[i] = {vel.x, vel.y, vel.z};
 		} else {
-			// Handle error or default values if a non-boid object is in the array
 			cuda_positions[i] = {0.0f, 0.0f, 0.0f};
 			cuda_current_velocities[i] = {0.0f, 0.0f, 0.0f};
 			UtilityFunctions::printerr("Non-BoidOOP object found in array at index ", i, " during CUDA update prep.");
 		}
 	}
 
-	// 3. Call the C Interface Function using member vector data
 	int cuda_result = calculate_boid_update_cuda_c_interface(
 		cuda_positions.data(),
 		cuda_current_velocities.data(),
-		cuda_new_velocities.data(), // Pass pointer to output buffer
+		cuda_new_velocities.data(),
 		num_boids,
 		(float)delta_time,
 		neighbor_distance,
@@ -192,11 +184,10 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 		alignment_weight,
 		cohesion_weight,
 		max_speed,
-		min_speed, // <-- Pass min_speed to C interface
+		min_speed,
 		max_force
 	);
 
-	// 4. Handle Potential Errors from CUDA call
 	if (cuda_result != 0) {
 		UtilityFunctions::printerr("CUDA calculation failed with error code: ", cuda_result);
 		// Return empty vector to signal failure to the caller
@@ -214,18 +205,14 @@ godot::Vector<godot::Vector3> BoidSystem::_calculate_boid_update_cuda_internal(
 Vector3 BoidSystem::wrap_position(Vector3 pos) const {
     Vector3 size = max_bound - min_bound;
 
-    // Handle potential zero size dimensions to avoid division by zero in fmod
     if (size.x <= 0.0f) {
         pos.x = min_bound.x;
     } else {
         if (pos.x < min_bound.x) {
-            // Wrap from left to right
             pos.x = max_bound.x - fmod(min_bound.x - pos.x, size.x);
         } else if (pos.x > max_bound.x) {
-            // Wrap from right to left
             pos.x = min_bound.x + fmod(pos.x - max_bound.x, size.x);
         }
-        // Ensure the result is exactly within bounds if fmod results in boundary value due to precision
          if (pos.x == max_bound.x) pos.x = min_bound.x;
     }
 
@@ -253,94 +240,6 @@ Vector3 BoidSystem::wrap_position(Vector3 pos) const {
 
     return pos;
 }
-
-// // --- CPU Boid Logic ---
-// void BoidSystem::_process_cpu(double delta) {
-// 	TypedArray<BoidOOP> current_boids = boid_oops; // Work on a copy? Or directly? Be careful if modifying array during iteration.
-// 	//Vector<Vector3> forces;
-// 	//forces.resize(current_boids.size()); // Pre-allocate forces vector
-// 	TypedArray<Vector3> forces;
-// 	forces.resize(current_boids.size()); // Pre-allocate forces vector
-
-// 	for (int i = 0; i < current_boids.size(); ++i) {
-// 		Variant v_i = current_boids[i];
-// 		BoidOOP *boid_i = Object::cast_to<BoidOOP>(v_i.operator Object*());
-// 		if (!boid_i) continue;
-
-// 		Vector3 separation_force;
-// 		Vector3 alignment_sum;
-// 		Vector3 cohesion_center;
-// 		int neighbor_count = 0;
-
-// 		for (int j = 0; j < current_boids.size(); ++j) {
-// 			if (i == j) continue;
-
-// 			Variant v_j = current_boids[j];
-// 			BoidOOP *boid_j = Object::cast_to<BoidOOP>(v_j.operator Object*());
-// 			if (!boid_j) continue;
-
-// 			float dist_sq = boid_i->get_position().distance_squared_to(boid_j->get_position());
-
-// 			if (dist_sq > 0 && dist_sq < 5.0f * 5.0f) {
-// 				neighbor_count++;
-// 				// Separation
-// 				Vector3 diff = boid_i->get_position() - boid_j->get_position();
-// 				// Normalize and weight by 1/distance (stronger when closer)
-// 				separation_force += diff.normalized() / sqrt(dist_sq); // Using sqrt here for 1/dist weighting
-
-// 				// Alignment
-// 				alignment_sum += boid_j->get_velocity();
-
-// 				// Cohesion
-// 				cohesion_center += boid_j->get_position();
-// 			}
-// 		}
-
-// 		Vector3 total_force;
-// 		if (neighbor_count > 0) {
-// 			// Finalize Separation
-// 			separation_force = (separation_force / neighbor_count).normalized() * 5.0f;
-// 			separation_force = (separation_force - boid_i->get_velocity()) * 1.5f; // Steering force
-
-// 			// Finalize Alignment
-// 			alignment_sum = (alignment_sum / neighbor_count).normalized() * 5.0f;
-// 			alignment_sum = (alignment_sum - boid_i->get_velocity()) * 1.0f; // Steering force
-
-// 			// Finalize Cohesion
-// 			cohesion_center /= neighbor_count;
-// 			Vector3 desired_cohesion = (cohesion_center - boid_i->get_position()).normalized() * 5.0f;
-// 			desired_cohesion = (desired_cohesion - boid_i->get_velocity()) * 1.0f; // Steering force
-
-// 			total_force = separation_force + alignment_sum + desired_cohesion;
-
-// 			// Limit Force
-// 			if (total_force.length_squared() > 10.0f * 10.0f) {
-// 				total_force = total_force.normalized() * 10.0f;
-// 			}
-// 		}
-// 		forces[i] = total_force; // Store calculated force
-// 	}
-
-// 	// Apply forces and update positions
-// 	for (int i = 0; i < current_boids.size(); ++i) {
-// 		Variant v = current_boids[i];
-// 		BoidOOP *boid = Object::cast_to<BoidOOP>(v.operator Object*());
-// 		if (boid) {
-// 			Vector3 velocity = boid->get_velocity();
-// 			// Acceleration = Force / Mass (assume mass = 1)
-// 			Vector3 acceleration = forces[i];
-// 			velocity += acceleration * delta;
-
-// 			// Limit Speed
-// 			if (velocity.length_squared() > 5.0f * 5.0f) {
-// 				velocity = velocity.normalized() * 5.0f;
-// 			}
-
-// 			boid->set_velocity(velocity);
-// 			boid->set_position(boid->get_position() + velocity * delta);
-// 		}
-// 	}
-// }
 
 // --- C++ Wrapper for CUDA Availability Check ---
 namespace godot {
