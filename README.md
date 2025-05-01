@@ -1,5 +1,7 @@
 # Godot Boids Simulation with C++ GDExtension and CUDA
 
+![](boids_gif.gif)
+
 ## Description
 
 This project implements a boids flocking simulation within the Godot Engine (v4.x). The core simulation logic is written in C++ using GDExtension, offering both CPU-based and CUDA-accelerated implementations for performance comparison.
